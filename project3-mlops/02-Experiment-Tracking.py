@@ -75,6 +75,10 @@ df = pd.read_csv("/dbfs/mnt/training/airbnb/sf-listings/airbnb-cleaned-mlflow.cs
 
 # COMMAND ----------
 
+display(df)
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC Perform a train/test split.
 

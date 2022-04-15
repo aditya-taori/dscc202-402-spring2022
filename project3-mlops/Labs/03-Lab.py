@@ -58,9 +58,17 @@ print("Created directory `{}` to house the project files.".format(path))
 #  TODO
 dbutils.fs.put(path + "MLproject", 
 '''
+name: Lab-03
 
-  FILL_IN
+conda_env: conda.yaml
 
+entry_points:
+  main:
+    parameters:
+      data_path: {type: str, default: "/dbfs/mnt/training/airbnb/sf-listings/airbnb-cleaned-mlflow.csv"}
+      bootstrap: {type: bool, default: True}
+      min_impurity_decrease: {type: float, default: 0}
+    command: "python train.py --data_path {data_path} --bootstrap {bootstrap} --min_impurity_decrease {min_impurity_decrease}"
 '''.strip())
 
 # COMMAND ----------
@@ -79,11 +87,25 @@ dbutils.fs.put(path + "MLproject",
 
 # COMMAND ----------
 
+print(path)
+
+# COMMAND ----------
+
 #  TODO
+import cloudpickle, numpy, pandas, sklearn
 dbutils.fs.put(path + "conda.yaml", 
 '''
 
-  FILL_IN
+name: Lesson-03
+channels:
+  - defaults
+dependencies:
+  - cloudpickle={0.5.3}
+  - numpy={1.14.3}
+  - pandas={0.23.0}
+  - scikit-learn={0.19.1}
+  - pip:
+    - mlflow=={1.0.0}
 
 '''.strip())
 
@@ -99,10 +121,97 @@ dbutils.fs.put(path + "conda.yaml",
 #  TODO
 dbutils.fs.put(path + "train.py", 
 '''
+import click
+import mlflow.sklearn
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.model_selection import train_test_split
 
-  FILL_IN
-  
+@click.command()
+@click.option("--data_path", default="/dbfs/mnt/training/airbnb/sf-listings/airbnb-cleaned-mlflow.csv", type=str)
+@click.option("--bootstrap", default=True, type=bool)
+@click.option("--min_impurity_decrease", default=0, type=float)
+def mlflow_rf(data_path, bootstrap, min_impurity_decrease):
+
+  with mlflow.start_run() as run:
+    # Import the data
+    df = pd.read_csv(data_path)
+    X_train, X_test, y_train, y_test = train_test_split(df.drop(["price"], axis=1), df[["price"]].values.ravel(), random_state=42)
+    
+    # Create model, train it, and create predictions
+    rf = RandomForestRegressor(bootstrap=bootstrap, min_impurity_decrease=min_impurity_decrease)
+    rf.fit(X_train, y_train)
+    predictions = rf.predict(X_test)
+
+    # Log model
+    mlflow.sklearn.log_model(rf, "random-forest-model")
+    
+    # Log params
+    mlflow.log_param("bootstrap", bootstrap)
+    mlflow.log_param("min_impurity_decrease", min_impurity_decrease)
+
+    # Log metrics
+    mlflow.log_metric("mse", mean_squared_error(y_test, predictions))
+    mlflow.log_metric("mae", mean_absolute_error(y_test, predictions))  
+    mlflow.log_metric("r2", r2_score(y_test, predictions))  
+
+if __name__ == "__main__":
+  mlflow_rf() # Note that this does not need arguments thanks to click
 '''.strip())
+
+# COMMAND ----------
+
+import click
+import mlflow.sklearn
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.model_selection import train_test_split
+
+@click.command()
+@click.option("--data_path", default="/dbfs/mnt/training/airbnb/sf-listings/airbnb-cleaned-mlflow.csv", type=str)
+@click.option("--bootstrap", default=True, type=bool)
+@click.option("--min_impurity_decrease", default=0, type=float)
+def mlflow_rf(data_path, bootstrap, min_impurity_decrease):
+
+    with mlflow.start_run() as run:
+        # Import the data
+        df = pd.read_csv(data_path)
+        X_train, X_test, y_train, y_test = train_test_split(df.drop(["price"], axis=1), df[["price"]].values.ravel(), random_state=42)
+
+        # Create model, train it, and create predictions
+        rf = RandomForestRegressor(bootstrap=bootstrap, min_impurity_decrease=min_impurity_decrease)
+        rf.fit(X_train, y_train)
+        predictions = rf.predict(X_test)
+
+        # Log model
+        mlflow.sklearn.log_model(rf, "random-forest-model")
+
+        # Log params
+        mlflow.log_param("bootstrap", bootstrap)
+        mlflow.log_param("min_impurity_decrease", min_impurity_decrease)
+
+        # Log metrics
+        mlflow.log_metric("mse", mean_squared_error(y_test, predictions))
+        mlflow.log_metric("mae", mean_absolute_error(y_test, predictions))  
+        mlflow.log_metric("r2", r2_score(y_test, predictions))  
+
+#if __name__ == "__main__":
+#  mlflow_rf() # Note that this does not need arguments thanks to click
+
+# COMMAND ----------
+
+from click.testing import CliRunner
+
+runner = CliRunner()
+result = runner.invoke(mlflow_rf, ['--bootstrap', True, '--max_depth', 20], catch_exceptions=True)
+
+print(result.exc_info)
+
+assert result.exit_code == 0, "Code failed" # Check to see that it worked
+
+print("Success!")
 
 # COMMAND ----------
 
@@ -130,6 +239,10 @@ mlflow.projects.run(uri=path.replace("dbfs:","/dbfs"),
     "bootstrap": False,
     "min_impurity_decrease": .1
 })
+
+# COMMAND ----------
+
+!mlflow run "/dbfs/user/ataori@ur.rochester.edu/mlflow/03_lab_psp/03-lab" -P bootstrap=False -P data_path="/dbfs/mnt/training/airbnb/sf-listings/airbnb-cleaned-mlflow.csv" -P min_impurity_decrease=0.1
 
 # COMMAND ----------
 

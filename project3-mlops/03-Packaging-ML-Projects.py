@@ -153,6 +153,10 @@ working_path = workingDir.replace("dbfs:", "/dbfs")
 
 # COMMAND ----------
 
+print(workingDir)
+
+# COMMAND ----------
+
 # MAGIC %md-sandbox
 # MAGIC Create the `MLproject` file.  This is the heart of an MLflow project.  It includes pointers to the conda environment and a `main` entry point, which is backed by the file `train.py`.
 # MAGIC 
